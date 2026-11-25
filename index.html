@@ -458,6 +458,7 @@
       const startJi = (jiIdx - ganIdx + 120) % 12;
       const gm1 = (startJi + 10) % 12;
       const gm2 = (startJi + 11) % 12;
+
       return [gm1, gm2];
     }
 
@@ -677,6 +678,42 @@
         if (currentAge2026 >= dw.age) currentDaewoon = dw;
       }
 
+      // 8) 괴강·고란·지지 형충파해 + 배우자성 위치 (일주 기준, 시간미상은 시주 제외)
+      const JI_NAMES=['자','축','인','묘','진','사','오','미','신','유','술','해'];
+      const GAN_NAMES=['갑','을','병','정','무','기','경','신','임','계'];
+      const dayPillar60=(dayGan*12+dayJi)%60; // not used
+      const dayGanName=GAN_NAMES[dayGan], dayJiName=JI_NAMES[dayJi];
+      const dayPillarName=dayGanName+dayJiName;
+      const GOEGANG=['무술','임진','경진','경술','무진','임술'];
+      const GORAN=['병인','정유','무신','신묘','임진','계사'];
+      const isGoegang=GOEGANG.includes(dayPillarName);
+      const isGoran=GORAN.includes(dayPillarName);
+      // 지지 관계 판정 (일지 vs 년·월·시지)
+      const CHUNG=[[0,6],[1,7],[2,8],[3,9],[4,10],[5,11]], HYUNG=[[2,5],[5,8],[2,8],[1,10],[10,7],[1,7],[0,3]], PA=[[0,9],[1,4],[2,11],[3,6],[5,8],[7,10]], HAE=[[0,7],[1,6],[2,5],[3,4],[8,11],[9,10]];
+      const isPair=(pairs,x,y)=>pairs.some(([a,b])=>(a===x&&b===y)||(a===y&&b===x));
+      const otherJis=[{label:'년지',ji:yearJi},{label:'월지',ji:monthJi},{label:'시지',ji:hourJi}].filter(o=>o.ji!==null&&o.ji!==dayJi);
+      const dayJiChungList=otherJis.filter(o=>isPair(CHUNG,dayJi,o.ji)).map(o=>o.label+'('+JI_NAMES[o.ji]+')');
+      const dayJiHyungList=otherJis.filter(o=>isPair(HYUNG,dayJi,o.ji)).map(o=>o.label+'('+JI_NAMES[o.ji]+')');
+      const dayJiPaList=otherJis.filter(o=>isPair(PA,dayJi,o.ji)).map(o=>o.label+'('+JI_NAMES[o.ji]+')');
+      const dayJiHaeList=otherJis.filter(o=>isPair(HAE,dayJi,o.ji)).map(o=>o.label+'('+JI_NAMES[o.ji]+')');
+      const selfHyung=[4,6,9,11].includes(dayJi); // 진·오·유·해 자형
+      // 배우자성(재/관) 위치: 천간에 있는지, 일지 지장간에 있는지
+      const spouseGanPos=[]; const pillarGans=[{label:'년',g:yearGan},{label:'월',g:monthGan},{label:'시',g:hourGan}];
+      pillarGans.forEach(o=>{if(o.g!==null&&CHEONGAN_EL[o.g]===spouseTargetEl) spouseGanPos.push(o.label+'간');});
+      const dayJiJanggan=JIJANGGAN[dayJi]||[]; const spouseInDayJi=dayJiJanggan.some(g=>CHEONGAN_EL[g]===spouseTargetEl);
+      const spouseInOtherJi=[yearJi,monthJi,hourJi].filter(j=>j!==null).some(j=>(JIJANGGAN[j]||[]).some(g=>CHEONGAN_EL[g]===spouseTargetEl));
+      // 도화(배우자궁 삼합 도화) 보유 여부
+      const salForDay=checkSal(dayJi); const hasDohwa=allJiji.includes(salForDay.dohwa);
+      // 이성운 시기: 2026~2035 세운 간·지가 배우자성 오행/도화/용희신에 닿는 해
+      const romanceYears=[]; for(let yr=2026;yr<=2035;yr++){const off=(yr-1984+6000)%60;const g=off%10,j=off%12;const gEl=CHEONGAN_EL[g],jEl=JIJI_EL[j];const tags=[];if(gEl===spouseTargetEl||jEl===spouseTargetEl)tags.push('배우자성');if(j===salForDay.dohwa)tags.push('도화');if(gEl===yongsin||jEl===yongsin)tags.push('용신');if(gEl===heesin||jEl===heesin)tags.push('희신');if(isPair(CHUNG,j,dayJi))tags.push('배우자궁 충');if(tags.length)romanceYears.push({year:yr,ganName:GAN_NAMES[g],jiName:JI_NAMES[j],tags});}
+      const daewoonSpouse=daewoonList.filter(d=>d.ganEl===spouseTargetEl||d.jiEl===spouseTargetEl||d.sipseongGan===getSipseong(dayGan, (gender==='M'? (elOrder.indexOf(spouseTargetEl)) : 0)) ).map(d=>({age:d.age,year:d.year,gan:GAN_NAMES[d.gan],ji:JI_NAMES[d.ji]}));
+      // 타 이성 관심 척도(0~100, 참고용): 배우자성 과다/혼잡, 도화 과다, 배우자궁 충·형·파·해, 공망, 괴강·고란 가산 — 단정 아님
+      let affairScore=18; if(spouseStarCount>=4)affairScore+=22; else if(spouseStarCount===3)affairScore+=12; else if(spouseStarCount===0)affairScore+=4;
+      if(dohwaCount>=2)affairScore+=16; else if(dohwaCount===1)affairScore+=6;
+      if(dayJiChungList.length)affairScore+=12; if(dayJiHyungList.length||selfHyung)affairScore+=8; if(dayJiPaList.length)affairScore+=6; if(dayJiHaeList.length)affairScore+=5;
+      if(dayGongmang.includes(dayJi)) affairScore+=8;
+      if(isGoran) affairScore+=8; if(isGoegang) affairScore+=4;
+      affairScore=Math.min(92,affairScore);
       return {
         name: name || (gender === 'M' ? '남성분' : '여성분'),
         gender,
@@ -709,6 +746,7 @@
         hwagaeCount,
         spouseStarCount,
         spouseTargetEl,
+        dayPillarName,isGoegang,isGoran,dayJiChungList,dayJiHyungList,dayJiPaList,dayJiHaeList,selfHyung,spouseGanPos,spouseInDayJi,spouseInOtherJi,hasDohwa,romanceYears,daewoonSpouse,affairScore,dayGanName,dayJiName,
         isForward,
         daewoonNum,
         daewoonList,
@@ -820,6 +858,20 @@
         return { year: yr, goodForA, cautionForA, goodForB, cautionForB };
       });
 
+      // 8) 궁합점수 (0~100, 설명용 가중합) + 이별·타 이성 관심 종합지표
+      let score=52; const breakdown=[];
+      const addS=(pts,label,ok)=>{if(ok){score+=pts;breakdown.push({label,pts});}};
+      addS(8,'천간합',isCheonganHap); addS(10,'일지 육합',dayJiYukhap); addS(8,'삼합 완성',formedSamhap.length>0); addS(4,'방합 완성',formedBanghap.length>0);
+      addS(8,'용신 상호보완',B_helps_A_yongsin&&A_helps_B_yongsin); addS(5,'한쪽 용신 보완', (B_helps_A_yongsin||A_helps_B_yongsin)&&!(B_helps_A_yongsin&&A_helps_B_yongsin));
+      addS(6,'서로 천을귀인',B_is_Cheoneul_for_A&&A_is_Cheoneul_for_B); addS(3,'한쪽 천을귀인',(B_is_Cheoneul_for_A||A_is_Cheoneul_for_B)&&!(B_is_Cheoneul_for_A&&A_is_Cheoneul_for_B));
+      addS(-12,'일지 충',dayJiChung); addS(-7,'일지 형',dayJiHyung); addS(-5,'일지 파',dayJiPa); addS(-4,'일지 해',dayJiHae); addS(-6,'일지 원진',dayJiWonjin);
+      addS(-6,'합이 기신으로 묶임',!!(isGisinTrapForA||isGisinTrapForB)); addS(-5,'배우자궁 공망 교차',!!(B_dayJi_in_A_gm||A_dayJi_in_B_gm));
+      addS(-6,'둘 다 괴강·고란', (A.isGoegang||A.isGoran)&&(B.isGoegang||B.isGoran));
+      addS(-8,'둘 다 타 이성 관심 높음',(A.affairScore>=55&&B.affairScore>=55)); addS(-4,'한쪽 타 이성 관심 높음',(A.affairScore>=55)!==(B.affairScore>=55));
+      score=Math.max(28,Math.min(97,Math.round(score)));
+      const scoreGrade=score>=85?'최상 — 서로를 완성하는 인연':score>=72?'상 — 다툼만 조율하면 오래 가는 인연':score>=58?'중상 — 노력만큼 깊어지는 인연':score>=45?'중 — 차이 조율이 관건인 인연':'하 — 각자 노력이 많이 필요한 인연';
+      // 이별수: 일지 충/형/파/해/원진 + 원국 배우자궁 충형 + 공망 + 괴강/고란 + 대운·세운 충 겹침
+      const breakupRisk=Math.max(8,Math.min(92, 22 + (dayJiChung?18:0)+(dayJiHyung?10:0)+(dayJiPa?7:0)+(dayJiHae?6:0)+(dayJiWonjin?8:0) + (A.dayJiChungList.length+B.dayJiChungList.length)*4 + (A.dayJiHyungList.length+B.dayJiHyungList.length)*3 + ((A_self_spouse_gm||B_self_spouse_gm)?8:0) + ((A.isGoegang||A.isGoran||B.isGoegang||B.isGoran)?6:0) ));
       return {
         relDiff,
         isCheonganHap,
@@ -846,7 +898,8 @@
         A_dayJi_in_B_gm,
         A_self_spouse_gm,
         B_self_spouse_gm,
-        futureYears
+        futureYears,
+        compatScore:score,scoreBreakdown:breakdown,scoreGrade,breakupRisk
       };
     }
 
@@ -1137,15 +1190,33 @@
         </div>
       `;
 
+      // 섹션 9: 궁합점수
+      const bar=(v,c)=>`<div class="h-2.5 rounded-full bg-[#EFECE4] overflow-hidden"><div class="h-full rounded-full" style="width:${v}%;background:${c}"></div></div>`;
+      const sec9 = `<div class="space-y-4"><div class="p-5 rounded-xl bg-[#FAF8F5] border border-[#E6E1D6] text-center"><div class="text-xs text-[#5C635F]">종합 궁합점수</div><div class="font-serif-kr text-5xl font-bold text-[#2C5E5A] my-1">${C.compatScore}<span class="text-xl"> / 100</span></div><p class="text-sm font-medium">${C.scoreGrade}</p><p class="text-xs text-[#5C635F] mt-1">점수는 원국의 합·충·용신 보완·귀인·공망 등을 가중합한 참고 지표입니다. 점수가 낮아도 시기 조율과 소통으로 충분히 오래 갈 수 있습니다.</p></div><div class="grid sm:grid-cols-2 gap-3">${C.scoreBreakdown.map(b=>`<div class="flex justify-between p-3 rounded-xl border border-[#E6E1D6] text-sm"><span>${b.label}</span><b class="${b.pts>=0?'text-[#2C5E5A]':'text-[#8F241E]'}">${b.pts>=0?'+':''}${b.pts}점</b></div>`).join('')||'<p class="text-sm">특별한 가감 요인이 없어 기준점 52점에서 출발하는 무난한 조합입니다.</p>'}</div><p class="text-xs text-[#5C635F]">해석: 85점 이상은 서로의 부족함을 자연히 채워주는 조합, 72~84점은 장점이 뚜렷하고 다툼 패턴만 조율하면 되는 조합, 58~71점은 노력과 대화량에 따라 깊이가 갈리는 조합, 45~57점은 생활 리듬·가치관 차이를 규칙으로 정해두는 것이 필요한 조합, 45점 미만은 서로를 바꾸려 하기보다 각자의 영역을 존중하는 거리 두기가 오래 가는 비결입니다.</p></div>`;
+      // 섹션 10: 이성운 시기
+      const romanceScore=(r)=>{let s=0; if(r.tags.includes('배우자성'))s+=4; if(r.tags.includes('도화'))s+=3; if(r.tags.includes('용신'))s+=2; if(r.tags.includes('희신'))s+=1; if(r.tags.includes('배우자궁 충'))s-=1; return s;};
+      const romanceTable=(P)=>{ const top3=[...P.romanceYears].sort((a,b)=>romanceScore(b)-romanceScore(a)||a.year-b.year).slice(0,3); if(!top3.length) return `<p class="text-sm">2026~2035년 사이 배우자성·도화·용희신이 세운에 강하게 닿는 해가 뚜렷하지 않습니다. 이 경우 기존 인연을 지키는 해가 되거나, 대운(10년 흐름)에서 배우자성이 들어오는 시기를 더 크게 봅니다.</p>`; return `<div class="space-y-2">${top3.map((r,idx)=>`<div class="flex flex-wrap gap-2 items-center p-3 rounded-xl border border-[#E6E1D6] text-sm"><b>${idx+1}순위 · ${r.year}년 (${r.ganName}${r.jiName})</b><span>${r.tags.join(' · ')}</span><span class="text-xs text-[#5C635F]">${r.tags.includes('배우자궁 충')?'배우자궁이 흔들리는 해라 만남·결혼 결정은 서두르지 말고, 이미 있는 관계는 다툼을 규칙으로 다스릴 것':r.tags.includes('배우자성')?'이성·결혼운이 가장 확실하게 들어오는 시기 — 소개·고백·프로포즈·결혼 논의에 유리':'이성운이 살아나는 해 — 만남의 문이 열리니 사람을 만나는 자리를 늘릴 것'}</span></div>`).join('')}</div>`; }
+      const sec10 = `<div class="space-y-5"><p class="text-sm text-[#5C635F]">아래는 2026~2035년 중 이성운이 가장 확실한 해만 우선순위 3개씩 추린 것입니다. 배우자성+도화+용희신이 겹칠수록 순위가 높습니다. 같은 해라도 싱글과 기혼·연애중의 해석이 다릅니다.</p><div><h4 class="font-semibold text-[#2C5E5A] mb-2">${nameA} 님 — 이성운 TOP 3</h4>${romanceTable(A)}${A.daewoonSpouse.length?`<p class="text-sm mt-2">배우자성이 들어오는 대운: ${A.daewoonSpouse.map(d=>`${d.age}세~ (${d.year}년~, ${d.gan}${d.ji})`).join(' / ')}</p>`:''}</div><div><h4 class="font-semibold text-[#B08D57] mb-2">${nameB} 님 — 이성운 TOP 3</h4>${romanceTable(B)}${B.daewoonSpouse.length?`<p class="text-sm mt-2">배우자성이 들어오는 대운: ${B.daewoonSpouse.map(d=>`${d.age}세~ (${d.year}년~, ${d.gan}${d.ji})`).join(' / ')}</p>`:''}</div><p class="text-xs text-[#5C635F]">주의: 이성운이 강한 해에 싱글이면 만남이 늘고, 연애·기혼이면 외부 이성에 대한 경계와 현재 관계에 대한 확인이 함께 필요합니다. 이성운이 없는 해가 나쁜 해가 아니라, 관계가 안정적으로 유지되는 해입니다.</p></div>`;
+      // 섹션 11: 형충·괴강·고란
+      const personRisk=(P,gm)=>{ const items=[]; if(P.isGoegang) items.push(`<b>괴강(${P.dayPillarName}) 있음</b> — 자기 주관이 강하고 배우자에게 쉽게 굽히지 않는 기질. 부부 사이에서는 자존심 대결로 번지기 쉬우니, 이기는 대화보다 지는 척 넘기는 대화가 필요합니다.`); if(P.isGoran) items.push(`<b>고란(${P.dayPillarName}) 있음</b> — 배우자 자리(일지)에 외로움·서운함이 쉽게 쌓이는 구조. 혼자 삭히면 서운함이 커지니, 서운함을 그날 말로 푸는 습관이 이별수를 낮춥니다.`); if(!P.isGoegang&&!P.isGoran) items.push(`괴강·고란 해당 없음 — 일주만으로 보는 고집·외로움의 극단 구조는 없습니다.`); if(P.dayJiChungList.length) items.push(`배우자궁 충: ${P.dayJiChungList.join(', ')} — 생활 리듬·가치관 충돌이 반복되면 이별 이야기가 오가기 쉽습니다.`); if(P.dayJiHyungList.length||P.selfHyung) items.push(`배우자궁 형: ${[...P.dayJiHyungList, ...(P.selfHyung?['자형(본인 일지 스스로 형)']:[])].join(', ')} — 말 한마디가 상처로 남고, 과거 일을 다시 꺼내는 패턴이 있으면 다툼이 길어집니다.`); if(P.dayJiPaList.length) items.push(`배우자궁 파: ${P.dayJiPaList.join(', ')} — 약속·신뢰가 조금씩 깨지는 경험이 쌓이면 정이 식습니다.`); if(P.dayJiHaeList.length) items.push(`배우자궁 해: ${P.dayJiHaeList.join(', ')} — 서운함을 말하지 않고 속으로 삭히는 패턴이 있으면 거리가 벌어집니다.`); if(!P.dayJiChungList.length&&!P.dayJiHyungList.length&&!P.dayJiPaList.length&&!P.dayJiHaeList.length&&!P.selfHyung) items.push(`원국 내 배우자궁 형충파해 없음 — 원국만으로는 이별의 극단 패턴이 강하지 않습니다.`); if(gm) items.push(`배우자궁 공망 — 함께 있어도 마음이 비어 보일 때가 있어, 상대가 소외감을 느끼지 않게 확인 대화를 자주 해줄 것.`); if(P.spouseStarCount>=3) items.push(`배우자성 ${P.spouseStarCount}개로 혼잡 — 이성 관계가 겹치거나 과거 인연이 다시 연락해오는 흐름이 생기기 쉬워, 경계 설정이 이별수를 가릅니다.`); if(P.spouseStarCount===0) items.push(`배우자성 없음 — 인연이 늦게 오거나, 평범한 틀 밖의 인연·늦은 결혼 형태로 오는 경우가 많습니다.`); return `<ul class="space-y-2 text-sm sm:text-base">${items.map(i=>`<li>· ${i}</li>`).join('')}</ul>`; };
+      const sec11 = `<div class="space-y-5"><div class="grid gap-3"><div class="p-4 rounded-xl border border-[#E6E1D6]"><div class="text-xs text-[#5C635F]">이별수 지수 (참고)</div><div class="font-serif-kr text-3xl font-bold text-[#8F241E]">${C.breakupRisk} / 100</div>${bar(C.breakupRisk,'#8F241E')}<p class="text-xs mt-2">${C.breakupRisk>=65?'충·형·공망·괴강/고란이 겹쳐 다툼이 이별 이야기로 번지기 쉬운 구조. 감정 대화의 규칙(말 끊지 않기·과거 소환 금지·하루 넘기지 않기)이 필수.':C.breakupRisk>=40?'다툼은 있지만 이별까지 가는 구조는 아닙니다. 충이 오는 해에만 주의하면 됩니다.':'이별의 극단 패턴이 강하지 않은 구조. 일상 소통만 잘 유지하면 오래 갑니다.'}</p></div></div><div><h4 class="font-semibold text-[#2C5E5A] mb-2">${nameA} 님</h4>${personRisk(A,C.A_self_spouse_gm)}</div><div><h4 class="font-semibold text-[#B08D57] mb-2">${nameB} 님</h4>${personRisk(B,C.B_self_spouse_gm)}</div><p class="text-xs text-[#5C635F]">핵심: 형충파해·괴강·고란은 "반드시 이혼한다"는 뜻이 아닙니다. "다툼이 어떤 모양으로 번지는지"를 알려주는 경향입니다. 같은 구조라도 말하는 방식과 경계 설정으로 결과는 크게 달라집니다.</p></div>`;
+      // 섹션 12: 타 이성 관심 척도
+      const affairText=(P)=>{ const lv=P.affairScore>=55?'높음':P.affairScore>=35?'보통':'낮음'; const why=[]; if(P.spouseStarCount>=3)why.push(`배우자성 ${P.spouseStarCount}개로 이성 접점이 많음`); if(P.dohwaCount>=2)why.push(`도화 ${P.dohwaCount}개로 이성에게 눈에 띄는 매력`); if(P.dayJiChungList.length)why.push('배우자궁 충으로 현재 관계에 대한 불만이 외부로 새기 쉬움'); if(P.isGoran)why.push('고란으로 배우자에게 서운함·외로움이 쌓이기 쉬움'); if(P.isGoegang)why.push('괴강으로 배우자에게 마음을 굽히지 않아 거리감이 생기기 쉬움'); if(!why.length)why.push('타 이성에 마음이 기울어지는 극단 구조가 뚜렷하지 않음'); return `<div><div class="flex items-center gap-3"><b>${P.name} 님</b><span class="text-sm">${lv} (${P.affairScore}/100)</span></div>${bar(P.affairScore, P.affairScore>=55?'#8F241E':'#2C5E5A')}<p class="text-sm mt-2">근거: ${why.join(' · ')}.</p><p class="text-sm mt-1">${P.affairScore>=55?'예방: 이성운이 강한 해(섹션 10)에는 이성과의 1:1 만남·늦은 연락·비밀 대화를 스스로 끊을 것. 배우자에게 서운함을 그날 말하고, 두 사람만의 데이트를 월 2회 이상 고정할 것.':'예방: 이성운이 강한 해에만 이성과의 경계를 한 번 더 확인할 것. 평소에는 현재 관계에 대한 감사 표현이 가장 큰 예방입니다.'}</p></div>`; };
+      const coupleAffair = (A.affairScore>=55&&B.affairScore>=55)?'두 사람 모두 외부 유혹에 흔들리기 쉬운 시기 구조라, 서로에 대한 경계와 확인을 "의심"이 아니라 "약속"으로 정해두는 것이 좋습니다.':(A.affairScore>=55||B.affairScore>=55)?'한쪽의 유혹 경향이 더 강한 구조입니다. 강한 쪽이 스스로 경계를 세우고, 다른 쪽이 의심·감시가 아니라 서운함을 말할 수 있는 분위기를 만들어주는 것이 예방의 핵심입니다.':'두 사람 모두 타 이성에 마음이 기울어지는 경향이 강하지 않은 구조입니다. 다만 이성운이 강한 해에는 누구나 흔들릴 수 있으니, 그 해에만 경계를 한 번 더 확인하세요.';
+      const sec12 = `<div class="space-y-5"><p class="text-sm text-[#5C635F]">이 <b>타 이성 관심 척도</b>는 "외도할 사람"을 단정하는 것이 아닙니다. 이성 접점·매력·배우자궁 불안정이 겹칠 때 외부 이성에 관심이 기울기 쉬운 <b>경향</b>을 보여주는 참고 지표입니다.</p>${affairText(A)}${affairText(B)}<div class="p-4 rounded-xl bg-[#FAF8F5] border border-[#E6E1D6]"><h4 class="font-semibold mb-1">두 사람 함께 보는 예방법</h4><p class="text-sm">${coupleAffair}</p><p class="text-sm mt-2">공통 예방 3가지: ① 이성운이 강한 해에는 이성과의 단둘이 만나는 자리·늦은 시간 연락을 피할 것 ② 서운함·외로움을 48시간 안에 말로 풀 것 ③ 휴대폰·일정을 감시하지 말고, 대신 두 사람만의 약속(데이트·대화 시간)을 먼저 고정할 것.</p></div></div>`;
       return [
         { num: '01', title: '각자의 기본 성향과 이성관·배우자복', content: sec1 },
-        { num: '02', title: '두 사람의 에너지 균형과 상호 보완성', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec2Text}</p>` },
-        { num: '03', title: '성격적 끌림과 관계의 주도권', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec3Text}</p>` },
-        { num: '04', title: '일상생활의 호흡과 정서적 유대감', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec4Lines.join(' ')}</p>` },
-        { num: '05', title: '서로에게 귀인이 되는 지점과 시너지', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec5Lines.join(' ')}</p>` },
-        { num: '06', title: '두 사람 관계의 강점과 반드시 주의할 함정', content: sec6 },
-        { num: '07', title: '각자가 보완할 행동과 함께 지킬 마음가짐', content: sec7 },
-        { num: '08', title: '시기별 관계 변화 흐름 (2026년~2030년)', content: sec8 }
+        { num: '02', title: '궁합점수 — 숫자로 보는 두 사람의 궁합', content: sec9 },
+        { num: '03', title: '두 사람의 에너지 균형과 상호 보완성', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec2Text}</p>` },
+        { num: '04', title: '성격적 끌림과 관계의 주도권', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec3Text}</p>` },
+        { num: '05', title: '일상생활의 호흡과 정서적 유대감', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec4Lines.join(' ')}</p>` },
+        { num: '06', title: '서로에게 귀인이 되는 지점과 시너지', content: `<p class="text-sm sm:text-base text-[#1F2421]">${sec5Lines.join(' ')}</p>` },
+        { num: '07', title: '두 사람 관계의 강점과 반드시 주의할 함정', content: sec6 },
+        { num: '08', title: '각자가 보완할 행동과 함께 지킬 마음가짐', content: sec7 },
+        { num: '09', title: '시기별 관계 변화 흐름 (2026년~2030년)', content: sec8 },
+        { num: '10', title: '각자 이성운이 들어오는 시기 (2026~2035) — 우선순위 TOP 3', content: sec10 },
+        { num: '11', title: '이별수', content: sec11 },
+        { num: '12', title: '타 이성 관심 척도 — 단정이 아닌 경향과 예방법', content: sec12 }
       ];
     }
 
